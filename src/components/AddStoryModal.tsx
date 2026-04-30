@@ -5,15 +5,19 @@ import { useState } from 'react';
 interface AddStoryModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (story: any) => void;
+    onAdd: (story: any) => Promise<boolean>;
 }
 
 export default function AddStoryModal({ isOpen, onClose, onAdd }: AddStoryModalProps) {
     const [form, setForm] = useState({ title: '', category: 'memory', date: '', description: '', location: '', image: '' });
+    const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onAdd({ ...form, id: Date.now(), createdAt: new Date().toISOString() });
+        setSubmitting(true);
+        const ok = await onAdd({ ...form, id: Date.now(), createdAt: new Date().toISOString() });
+        setSubmitting(false);
+        if (!ok) return;
         onClose();
         setForm({ title: '', category: 'memory', date: '', description: '', location: '', image: '' });
     };
@@ -117,11 +121,11 @@ export default function AddStoryModal({ isOpen, onClose, onAdd }: AddStoryModalP
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                        <button type="button" onClick={onClose} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium">
+                        <button type="button" onClick={onClose} disabled={submitting} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium disabled:opacity-60">
                             Cancel
                         </button>
-                        <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30">
-                            Add Story
+                        <button type="submit" disabled={submitting} className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30 disabled:opacity-60">
+                            {submitting ? 'Saving...' : 'Add Story'}
                         </button>
                     </div>
                 </form>

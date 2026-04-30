@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
 import { supabase } from '@/lib/supabase';
 
 export interface FamilyMember {
@@ -45,16 +44,87 @@ function normalizeGender(gender?: string): 'male' | 'female' {
   return gender?.toLowerCase() === 'female' ? 'female' : 'male';
 }
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object') {
+    const maybe = err as { message?: string; details?: string; hint?: string; code?: string };
+    if (maybe.message) return maybe.message;
+    const parts = [maybe.code, maybe.details, maybe.hint].filter(Boolean);
+    if (parts.length) return parts.join(' - ');
+  }
+  return fallback;
+}
+
 export function useFamilyData() {
-  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState<string>('');
+  const [authName, setAuthName] = useState<string>('User');
+  const [authAvatar, setAuthAvatar] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<FamilyMember | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [stories, setStories] = useState<FamilyStory[]>([]);
+  const [collaboratorRole, setCollaboratorRole] = useState<'viewer' | 'editor'>('editor');
+  const canEdit = collaboratorRole === 'editor';
+
+  const ensureDbUserId = useCallback(async (): Promise<string> => {
+    if (!authUserId) {
+      throw new Error('You are not authenticated.');
+    }
+
+    const { data: dbUser, error: fetchError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (dbUser?.id) {
+      return dbUser.id;
+    }
+
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert({
+        auth_user_id: authUserId,
+        email: authEmail,
+        full_name: authName,
+        avatar_url: authAvatar,
+      })
+      .select('id')
+      .single();
+
+    if (createError || !newUser?.id) {
+      throw createError || new Error('Could not create user profile row.');
+    }
+
+    return newUser.id;
+  }, [authUserId, authEmail, authName, authAvatar]);
+
+  const buildFallbackCurrentUser = useCallback((): FamilyMember => ({
+    id: authUserId || 'pending',
+    name: authName || 'User',
+    firstName: (authName || 'User').split(' ')[0],
+    lastName: (authName || 'User').split(' ').slice(1).join(' ') || '',
+    gender: 'male',
+    email: authEmail || '',
+    phone: '',
+    location: '',
+    picture: authAvatar || '',
+    birthDate: '',
+    age: 0,
+    relation: 'Self',
+    status: 'Living',
+  }), [authAvatar, authEmail, authName, authUserId]);
 
   const fetchFamilyData = useCallback(async () => {
-    if (!isClerkLoaded || !clerkUser) {
+    if (!authUserId) {
       setLoading(false);
       return;
     }
@@ -63,46 +133,57 @@ export function useFamilyData() {
     setError(null);
 
     try {
-      const clerkId = clerkUser.id;
-      const userEmail = clerkUser.primaryEmailAddress?.emailAddress || '';
-      const userFullName = clerkUser.fullName || clerkUser.username || 'User';
-      const userAvatar = clerkUser.imageUrl || '';
-
       // Get or create user in Supabase
-      let { data: dbUser } = await supabase
+      const { data: dbUser, error: dbUserFetchError } = await supabase
         .from('users')
         .select('*')
-        .eq('clerk_id', clerkId)
-        .single();
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
 
-      if (!dbUser) {
+      let activeUser = dbUser;
+
+      if (dbUserFetchError) {
+        setCurrentUser(buildFallbackCurrentUser());
+        setFamilyMembers([]);
+        setStories([]);
+        setError(getErrorMessage(dbUserFetchError, 'Could not read your profile from database.'));
+        return;
+      }
+
+      if (!activeUser) {
         // Create new user
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert({
-            clerk_id: clerkId,
-            email: userEmail,
-            full_name: userFullName,
-            avatar_url: userAvatar,
+            auth_user_id: authUserId,
+            email: authEmail,
+            full_name: authName,
+            avatar_url: authAvatar,
           })
           .select()
           .single();
 
-        if (createError) throw createError;
-        dbUser = newUser;
+        if (createError) {
+          setCurrentUser(buildFallbackCurrentUser());
+          setFamilyMembers([]);
+          setStories([]);
+          setError(getErrorMessage(createError, 'Profile setup failed. Please run the latest Supabase SQL schema.'));
+          return;
+        }
+        activeUser = newUser;
       }
 
-      // Set current user from Clerk + DB data
+      // Set current user from auth + DB data
       setCurrentUser({
-        id: dbUser.id,
-        name: dbUser.full_name || userFullName,
-        firstName: (dbUser.full_name || userFullName).split(' ')[0],
-        lastName: (dbUser.full_name || userFullName).split(' ').slice(1).join(' ') || '',
+        id: activeUser.id,
+        name: activeUser.full_name || authName,
+        firstName: (activeUser.full_name || authName).split(' ')[0],
+        lastName: (activeUser.full_name || authName).split(' ').slice(1).join(' ') || '',
         gender: 'male' as const,
-        email: dbUser.email || userEmail,
+        email: activeUser.email || authEmail,
         phone: '',
         location: '',
-        picture: dbUser.avatar_url || userAvatar,
+        picture: activeUser.avatar_url || authAvatar,
         birthDate: '',
         age: 0,
         relation: 'Self',
@@ -113,22 +194,26 @@ export function useFamilyData() {
       const { data: members, error: membersError } = await supabase
         .from('family_members')
         .select('*')
-        .eq('user_id', dbUser.id)
+        .eq('user_id', activeUser.id)
         .order('created_at', { ascending: true });
 
-      if (membersError) throw membersError;
+      if (membersError) {
+        setError(getErrorMessage(membersError, 'Could not load family members.'));
+      }
 
       // Fetch stories
       const { data: userStories, error: storiesError } = await supabase
         .from('stories')
         .select('*')
-        .eq('user_id', dbUser.id)
+        .eq('user_id', activeUser.id)
         .order('created_at', { ascending: false });
 
-      if (storiesError) throw storiesError;
+      if (storiesError) {
+        setError(getErrorMessage(storiesError, 'Could not load stories.'));
+      }
 
       setFamilyMembers(
-        (members || []).map((member: any) => ({
+        ((membersError ? [] : members) || []).map((member: any) => ({
           id: member.id,
           name: member.name || '',
           firstName: member.first_name || '',
@@ -145,7 +230,7 @@ export function useFamilyData() {
         }))
       );
       setStories(
-        (userStories || []).map((story: any) => ({
+        ((storiesError ? [] : userStories) || []).map((story: any) => ({
           id: story.id,
           title: story.title || '',
           description: story.description || '',
@@ -159,16 +244,53 @@ export function useFamilyData() {
           comments: story.comments || 0,
         }))
       );
+      if (!membersError && !storiesError) {
+        setError(null);
+      } else {
+        setError('Some profile data could not be loaded yet. You can still add members now.');
+      }
     } catch (err) {
-      console.error('Error fetching family data:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setCurrentUser(buildFallbackCurrentUser());
+      setFamilyMembers([]);
+      setStories([]);
+      setError(getErrorMessage(err, 'Unable to load existing family data right now.'));
     } finally {
       setLoading(false);
     }
-  }, [clerkUser, isClerkLoaded]);
+  }, [authUserId, authEmail, authName, authAvatar, buildFallbackCurrentUser]);
 
   useEffect(() => {
+    const role =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('ancestrylink_access_role')
+        : null;
+    if (role === 'viewer' || role === 'editor') {
+      setCollaboratorRole(role);
+    } else {
+      setCollaboratorRole('editor');
+    }
+
+    const loadSession = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setAuthUserId(data.user.id);
+        setAuthEmail(data.user.email || '');
+        setAuthName(data.user.user_metadata?.full_name || data.user.email || 'User');
+        setAuthAvatar(data.user.user_metadata?.avatar_url || '');
+      } else {
+        setAuthUserId(null);
+      }
+    };
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      loadSession();
+    });
+
+    loadSession();
     fetchFamilyData();
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
   }, [fetchFamilyData]);
 
   const refreshData = useCallback(() => {
@@ -176,20 +298,18 @@ export function useFamilyData() {
   }, [fetchFamilyData]);
 
   const addChild = useCallback(async (child: AddMemberInput) => {
-    if (!clerkUser) return;
+    if (!authUserId) return false;
+    if (!canEdit) {
+      setError('You have view-only permission. Ask for editor access to add members.');
+      return false;
+    }
 
     try {
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerkUser.id)
-        .single();
-
-      if (!dbUser) throw new Error('User not found');
+      const dbUserId = await ensureDbUserId();
 
       const normalizedGender = normalizeGender(child.gender);
       const newMember = {
-        user_id: dbUser.id,
+        user_id: dbUserId,
         name: child.name || '',
         first_name: child.firstName || child.name?.split(' ')[0] || '',
         last_name: child.lastName || child.name?.split(' ').slice(1).join(' ') || '',
@@ -227,25 +347,26 @@ export function useFamilyData() {
         relation: data.relation,
         status: data.status,
       }]);
+      setError(null);
+      return true;
     } catch (err) {
-      console.error('Error adding child:', err);
+      setError(getErrorMessage(err, 'Unable to save family member.'));
+      return false;
     }
-  }, [clerkUser]);
+  }, [authUserId, ensureDbUserId, canEdit]);
 
   const addSpouse = useCallback(async (spouse: AddMemberInput) => {
-    if (!clerkUser) return;
+    if (!authUserId) return false;
+    if (!canEdit) {
+      setError('You have view-only permission. Ask for editor access to add members.');
+      return false;
+    }
 
     try {
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerkUser.id)
-        .single();
-
-      if (!dbUser) throw new Error('User not found');
+      const dbUserId = await ensureDbUserId();
 
       const newMember = {
-        user_id: dbUser.id,
+        user_id: dbUserId,
         name: spouse.name || '',
         first_name: spouse.name?.split(' ')[0] || '',
         last_name: spouse.name?.split(' ').slice(1).join(' ') || '',
@@ -283,25 +404,26 @@ export function useFamilyData() {
         relation: data.relation,
         status: data.status,
       }]);
+      setError(null);
+      return true;
     } catch (err) {
-      console.error('Error adding spouse:', err);
+      setError(getErrorMessage(err, 'Unable to save spouse.'));
+      return false;
     }
-  }, [clerkUser]);
+  }, [authUserId, ensureDbUserId, canEdit]);
 
   const addStory = useCallback(async (story: AddStoryInput) => {
-    if (!clerkUser) return;
+    if (!authUserId) return false;
+    if (!canEdit) {
+      setError('You have view-only permission. Ask for editor access to add stories.');
+      return false;
+    }
 
     try {
-      const { data: dbUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerkUser.id)
-        .single();
-
-      if (!dbUser) throw new Error('User not found');
+      const dbUserId = await ensureDbUserId();
 
       const newStory = {
-        user_id: dbUser.id,
+        user_id: dbUserId,
         title: story.title || '',
         description: story.description || '',
         category: story.category || 'memory',
@@ -331,13 +453,20 @@ export function useFamilyData() {
         likes: data.likes,
         comments: data.comments,
       }, ...prev]);
+      setError(null);
+      return true;
     } catch (err) {
-      console.error('Error adding story:', err);
+      setError(getErrorMessage(err, 'Unable to save story.'));
+      return false;
     }
-  }, [clerkUser]);
+  }, [authUserId, ensureDbUserId, canEdit]);
 
   const updateProfile = useCallback(async (data: { name: string; birthDate: string; photo?: string; phone?: string; email?: string; location?: string; bio?: string }) => {
-    if (!clerkUser || !currentUser) return;
+    if (!authUserId || !currentUser) return false;
+    if (!canEdit) {
+      setError('You have view-only permission. Ask for editor access to update profile.');
+      return false;
+    }
 
     try {
       const [firstName, ...lastNameParts] = data.name.split(' ');
@@ -349,7 +478,7 @@ export function useFamilyData() {
           full_name: data.name,
           avatar_url: data.photo,
         })
-        .eq('clerk_id', clerkUser.id);
+        .eq('auth_user_id', authUserId);
 
       if (error) throw error;
 
@@ -364,17 +493,22 @@ export function useFamilyData() {
         email: data.email || prev.email,
         location: data.location || prev.location,
       } : null);
+      setError(null);
+      return true;
     } catch (err) {
-      console.error('Error updating profile:', err);
+      setError(getErrorMessage(err, 'Unable to update profile.'));
+      return false;
     }
-  }, [clerkUser, currentUser]);
+  }, [authUserId, currentUser, canEdit]);
 
   return {
-    loading: loading || !isClerkLoaded,
+    loading,
     error,
     currentUser,
     familyMembers,
     stories,
+    collaboratorRole,
+    canEdit,
     refreshData,
     addChild,
     addSpouse,

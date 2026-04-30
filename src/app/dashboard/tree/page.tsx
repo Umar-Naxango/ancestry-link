@@ -6,7 +6,7 @@ import { useFamilyData, FamilyMember } from '@/hooks/useFamilyData';
 import { useState } from 'react';
 
 export default function FamilyTreePage() {
-    const { loading, error, currentUser, familyMembers, refreshData, addChild } = useFamilyData();
+    const { loading, error, currentUser, familyMembers, canEdit, refreshData, addChild } = useFamilyData();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const grandparents = familyMembers.filter(m => m.relation === 'Father' || m.relation === 'Mother').slice(0, 2);
@@ -54,12 +54,16 @@ export default function FamilyTreePage() {
                     >
                         <FaSyncAlt /> Refresh
                     </button>
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 flex-1 sm:flex-none"
-                    >
-                        <FaPlus /> Add Member
-                    </button>
+                    {canEdit ? (
+                        <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 flex-1 sm:flex-none"
+                        >
+                            <FaPlus /> Add Member
+                        </button>
+                    ) : (
+                        <span className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">View-only access</span>
+                    )}
                 </div>
             </div>
 
@@ -73,7 +77,7 @@ export default function FamilyTreePage() {
                                 {grandparents.map((member, index) => (
                                     <div key={member.id} className="text-center">
                                         <div className="w-24 h-24 bg-amber-100 dark:bg-amber-900/30 rounded-3xl mx-auto flex items-center justify-center mb-3 overflow-hidden border-2 border-amber-300 dark:border-amber-700">
-                                            <img src={member.picture} alt={member.name} className="w-full h-full object-cover" />
+                                            <img src={member.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}&background=f59e0b&color=ffffff`} alt={member.name} className="w-full h-full object-cover" />
                                         </div>
                                         <p className="font-semibold dark:text-gray-200">{member.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{member.relation}</p>
@@ -92,7 +96,7 @@ export default function FamilyTreePage() {
                         {currentUser && (
                             <div className="text-center">
                                 <div className="w-28 h-28 bg-emerald-100 dark:bg-emerald-900/30 rounded-3xl mx-auto flex items-center justify-center mb-3 border-4 border-emerald-500 overflow-hidden">
-                                    <img src={currentUser.picture} alt={currentUser.name} className="w-full h-full object-cover" />
+                                    <img src={currentUser.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'User')}&background=10b981&color=ffffff`} alt={currentUser.name} className="w-full h-full object-cover" />
                                 </div>
                                 <p className="font-bold text-lg dark:text-gray-200">{currentUser.name}</p>
                                 <p className="text-sm text-emerald-600 dark:text-emerald-400">You</p>
@@ -101,7 +105,7 @@ export default function FamilyTreePage() {
                         {spouse && (
                             <div className="text-center">
                                 <div className="w-28 h-28 bg-pink-100 dark:bg-pink-900/30 rounded-3xl mx-auto flex items-center justify-center mb-3 border-4 border-pink-300 dark:border-pink-700 overflow-hidden">
-                                    <img src={spouse.picture} alt={spouse.name} className="w-full h-full object-cover" />
+                                    <img src={spouse.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(spouse.name || 'Spouse')}&background=f472b6&color=ffffff`} alt={spouse.name} className="w-full h-full object-cover" />
                                 </div>
                                 <p className="font-bold text-lg dark:text-gray-200">{spouse.name}</p>
                                 <p className="text-sm text-pink-600 dark:text-pink-400">Spouse</p>
@@ -119,7 +123,7 @@ export default function FamilyTreePage() {
                                 {children.map((child) => (
                                     <div key={child.id} className="text-center">
                                         <div className={`w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-3 overflow-hidden border-2 ${child.gender === 'male' ? 'bg-sky-100 dark:bg-sky-900/30 border-sky-300 dark:border-sky-700' : 'bg-rose-100 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700'}`}>
-                                            <img src={child.picture} alt={child.name} className="w-full h-full object-cover" />
+                                            <img src={child.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(child.name || 'Child')}&background=0ea5e9&color=ffffff`} alt={child.name} className="w-full h-full object-cover" />
                                         </div>
                                         <p className="font-semibold dark:text-gray-200">{child.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{child.gender === 'male' ? 'Son' : 'Daughter'}</p>
@@ -132,12 +136,14 @@ export default function FamilyTreePage() {
                     {children.length === 0 && (
                         <div className="text-center py-8">
                             <p className="text-gray-500 dark:text-gray-400 mb-4">No children added yet</p>
-                            <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="px-6 py-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-2xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
-                            >
-                                Add Child
-                            </button>
+                            {canEdit ? (
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="px-6 py-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-2xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                                >
+                                    Add Child
+                                </button>
+                            ) : null}
                         </div>
                     )}
                 </div>

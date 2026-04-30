@@ -6,7 +6,7 @@ import AddStoryModal from '@/components/AddStoryModal';
 import { useFamilyData } from '@/hooks/useFamilyData';
 
 export default function StoriesPage() {
-    const { loading, error, stories, refreshData, addStory } = useFamilyData();
+    const { loading, error, stories, canEdit, refreshData, addStory } = useFamilyData();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getCategoryColor = (category: string) => {
@@ -67,24 +67,30 @@ export default function StoriesPage() {
                     >
                         <FaSyncAlt /> Refresh
                     </button>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 flex-1 sm:flex-none"
-                    >
-                        <FaPlus /> Add New Story
-                    </button>
+                    {canEdit ? (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 flex-1 sm:flex-none"
+                        >
+                            <FaPlus /> Add New Story
+                        </button>
+                    ) : (
+                        <span className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">View-only access</span>
+                    )}
                 </div>
             </div>
 
             {stories.length === 0 ? (
                 <div className="text-center py-16 bg-white dark:bg-[#1a1a1a] rounded-3xl border dark:border-gray-800">
                     <p className="text-gray-500 dark:text-gray-400 mb-4">No stories yet</p>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="px-6 py-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-2xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
-                    >
-                        Create Your First Story
-                    </button>
+                    {canEdit ? (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="px-6 py-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-2xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                        >
+                            Create Your First Story
+                        </button>
+                    ) : null}
                 </div>
             ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">

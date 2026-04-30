@@ -6,7 +6,7 @@ import AddMemberModal from '@/components/AddMemberModal';
 import { useFamilyData, FamilyMember } from '@/hooks/useFamilyData';
 
 export default function MembersPage() {
-    const { loading, error, familyMembers, refreshData, addChild } = useFamilyData();
+    const { loading, error, familyMembers, canEdit, refreshData, addChild } = useFamilyData();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -64,12 +64,16 @@ export default function MembersPage() {
                     >
                         <FaSyncAlt /> Refresh
                     </button>
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex justify-center items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 whitespace-nowrap"
-                    >
-                        <FaPlus /> Add Member
-                    </button>
+                    {canEdit ? (
+                        <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex justify-center items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 whitespace-nowrap"
+                        >
+                            <FaPlus /> Add Member
+                        </button>
+                    ) : (
+                        <span className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">View-only access</span>
+                    )}
                 </div>
             </div>
 
@@ -91,7 +95,7 @@ export default function MembersPage() {
                             <tr key={member.id} className="border-b dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#252525] transition">
                                 <td className="px-8 py-5">
                                     <div className="flex items-center gap-3">
-                                        <img src={member.picture} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
+                                        <img src={member.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}&background=10b981&color=ffffff`} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
                                         <div>
                                             <p className="font-medium text-gray-900 dark:text-gray-200">{member.name}</p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FaTree,
   FaUsers,
@@ -15,10 +15,10 @@ import {
   FaBars,
   FaTimes,
 } from 'react-icons/fa';
-import { UserButton } from '@clerk/nextjs';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationModal from '@/components/NotificationModal';
 import InviteModal from '@/components/InviteModal';
+import { supabase } from '@/lib/supabase';
 
 const navLinks = [
   { href: '/dashboard', label: 'Overview', icon: <FaChartBar /> },
@@ -38,6 +38,54 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [avatarLetter, setAvatarLetter] = useState('U');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const syncUserFromSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      if (!user) {
+        window.location.href = '/sign-in';
+        return;
+      }
+      const letter = user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U';
+      setAvatarLetter(String(letter).toUpperCase());
+      setCheckingAuth(false);
+    };
+
+    syncUserFromSession();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      if (!user) {
+        window.location.href = '/sign-in';
+        return;
+      }
+      const letter = user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U';
+      setAvatarLetter(String(letter).toUpperCase());
+      setCheckingAuth(false);
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.localStorage.removeItem('ancestrylink_access_role');
+    window.localStorage.removeItem('ancestrylink_owner_user_id');
+    window.location.href = '/sign-in';
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#121212] flex items-center justify-center">
+        <p className="text-gray-700 dark:text-gray-200">Loading your dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#121212] overflow-hidden">
@@ -119,13 +167,13 @@ export default function DashboardLayout({
             </button>
 
             {/* User Profile */}
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: "w-10 h-10 rounded-2xl"
-                }
-              }}
-            />
+            <button
+              onClick={signOut}
+              className="w-10 h-10 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+              title="Sign out"
+            >
+              {avatarLetter}
+            </button>
           </div>
         </header>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 interface InviteModalProps {
     isOpen: boolean;
@@ -12,17 +13,63 @@ export default function InviteModal({ isOpen, onClose }: InviteModalProps) {
     const [message, setMessage] = useState('');
     const [role, setRole] = useState('viewer');
     const [sent, setSent] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSent(true);
-        setTimeout(() => {
-            setSent(false);
+        setSending(true);
+        setError(null);
+
+        try {
+            const { data: authData } = await supabase.auth.getUser();
+            if (!authData.user) throw new Error('You need to sign in again.');
+
+            const { data: ownerRow, error: ownerError } = await supabase
+                .from('users')
+                .select('id, full_name, email')
+                .eq('auth_user_id', authData.user.id)
+                .single();
+
+            if (ownerError || !ownerRow) throw new Error('Could not resolve your profile. Refresh and try again.');
+
+            const token = crypto.randomUUID();
+            const { error: inviteInsertError } = await supabase.from('family_invites').insert({
+                owner_user_id: ownerRow.id,
+                recipient_email: email.toLowerCase().trim(),
+                role: role,
+                token,
+                status: 'pending',
+                message,
+            });
+
+            if (inviteInsertError) throw inviteInsertError;
+
+            const inviteLink = `${window.location.origin}/invite/${token}`;
+            const res = await fetch('/api/invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: email.trim(),
+                    role,
+                    message,
+                    inviteLink,
+                    inviterName: ownerRow.full_name || ownerRow.email || 'A family member',
+                }),
+            });
+
+            const body = await res.json();
+            if (!res.ok) throw new Error(body?.error || 'Unable to send invitation email.');
+
+            setSent(true);
             setEmail('');
             setMessage('');
             setRole('viewer');
-            onClose();
-        }, 2000);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to send invite.');
+        } finally {
+            setSending(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -40,7 +87,7 @@ export default function InviteModal({ isOpen, onClose }: InviteModalProps) {
 
                 {sent ? (
                     <div className="p-6 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-2xl text-center font-medium">
-                        Invitation sent successfully!
+                        Invitation sent successfully. The recipient will receive {role === 'editor' ? 'edit' : 'view-only'} access.
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-5">
@@ -96,13 +143,14 @@ export default function InviteModal({ isOpen, onClose }: InviteModalProps) {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                            <button type="button" onClick={onClose} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium">
+                            <button type="button" onClick={onClose} disabled={sending} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium disabled:opacity-60">
                                 Cancel
                             </button>
-                            <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30">
-                                Send Invite
+                            <button type="submit" disabled={sending} className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30 disabled:opacity-60">
+                                {sending ? 'Sending...' : 'Send Invite'}
                             </button>
                         </div>
+                        {error ? <p className="text-sm text-red-500">{error}</p> : null}
                     </form>
                 )}
             </div>

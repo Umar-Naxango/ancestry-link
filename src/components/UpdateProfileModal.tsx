@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { uploadCompressedImage } from '@/lib/mediaUpload';
 
 interface UpdateProfileModalProps {
     isOpen: boolean;
@@ -13,11 +15,14 @@ interface UpdateProfileModalProps {
     currentEmail?: string;
     currentLocation?: string;
     currentBio?: string;
-    onUpdate: (data: { name: string, birthDate: string, photo?: string, phone?: string, email?: string, location?: string, bio?: string }) => void;
+    onUpdate: (data: { name: string, birthDate: string, photo?: string, phone?: string, email?: string, location?: string, bio?: string }) => Promise<boolean>;
 }
 
 export default function UpdateProfileModal({ isOpen, onClose, currentName, currentBirthDate, currentPhoto, currentPhone, currentEmail, currentLocation, currentBio, onUpdate }: UpdateProfileModalProps) {
     const [form, setForm] = useState({ name: currentName, birthDate: currentBirthDate, photo: currentPhoto || '', phone: currentPhone || '', email: currentEmail || '', location: currentLocation || '', bio: currentBio || '' });
+    const [submitting, setSubmitting] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -33,10 +38,32 @@ export default function UpdateProfileModal({ isOpen, onClose, currentName, curre
         });
     }, [isOpen, currentName, currentBirthDate, currentPhoto, currentPhone, currentEmail, currentLocation, currentBio]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onUpdate(form);
+        setSubmitting(true);
+        const success = await onUpdate(form);
+        setSubmitting(false);
+        if (!success) return;
         onClose();
+    };
+
+    const onSelectPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const inputEl = e.currentTarget;
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadError(null);
+        setUploading(true);
+        try {
+            const { data } = await supabase.auth.getUser();
+            if (!data.user) throw new Error('Sign in again before uploading photos.');
+            const url = await uploadCompressedImage(file, data.user.id, 'profiles');
+            setForm((prev) => ({ ...prev, photo: url }));
+        } catch (err) {
+            setUploadError(err instanceof Error ? err.message : 'Failed to upload photo.');
+        } finally {
+            setUploading(false);
+            if (inputEl) inputEl.value = '';
+        }
     };
 
     if (!isOpen) return null;
@@ -68,7 +95,18 @@ export default function UpdateProfileModal({ isOpen, onClose, currentName, curre
                     </div>
 
                     <div>
-                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo URL</label>
+                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={onSelectPhoto}
+                            className="w-full px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl focus:outline-none"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Choose from device. We auto-compress before upload.</p>
+                    </div>
+
+                    <div>
+                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo URL (optional)</label>
                         <input
                             type="url"
                             value={form.photo}
@@ -76,6 +114,8 @@ export default function UpdateProfileModal({ isOpen, onClose, currentName, curre
                             className="w-full px-5 py-4 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all"
                             placeholder="https://example.com/photo.jpg"
                         />
+                        {uploading ? <p className="text-xs text-emerald-600 mt-2">Uploading image...</p> : null}
+                        {uploadError ? <p className="text-xs text-red-500 mt-2">{uploadError}</p> : null}
                     </div>
 
                     <div>
@@ -146,11 +186,11 @@ export default function UpdateProfileModal({ isOpen, onClose, currentName, curre
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                        <button type="button" onClick={onClose} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium">
+                        <button type="button" onClick={onClose} disabled={submitting} className="flex-1 py-4 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all font-medium disabled:opacity-60">
                             Cancel
                         </button>
-                        <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30">
-                            Save Changes
+                        <button type="submit" disabled={submitting} className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg shadow-emerald-500/30 disabled:opacity-60">
+                            {submitting ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
                 </form>
