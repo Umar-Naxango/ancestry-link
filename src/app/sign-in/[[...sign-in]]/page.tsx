@@ -147,7 +147,7 @@ export default function SignInPage() {
               </div>
 
               <div className="flex justify-end pt-2">
-                <Link href="/forgot-password" size={14} className="text-sm font-bold text-emerald-600 hover:text-emerald-700">Forgot Password?</Link>
+                <Link href="/forgot-password" className="text-sm font-bold text-emerald-600 hover:text-emerald-700">Forgot Password?</Link>
               </div>
 
               <button 
