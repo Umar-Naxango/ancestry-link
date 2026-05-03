@@ -43,12 +43,12 @@ export default function Hero() {
                         <div className="flex items-center gap-2">
                             <div className="flex -space-x-3">
                                 {['👴', '👵', '👨‍👩‍👧'].map((emoji, i) => (
-                                    <span key={i} className="text-2xl">{emoji}</span>
+                                    <span key={i} className="text-2xl" suppressHydrationWarning>{emoji}</span>
                                 ))}
                             </div>
-                            <span className="text-gray-600 dark:text-gray-400">10,000+ families</span>
+                            <span className="text-gray-600 dark:text-gray-400">{"10,000+ families"}</span>
                         </div>
-                        <div className="text-emerald-600 dark:text-emerald-400 font-medium">4.9/5 from 2.3k reviews</div>
+                        <div className="text-emerald-600 dark:text-emerald-400 font-medium">{"4.9/5 from 2.3k reviews"}</div>
                     </div>
                 </div>
 
@@ -64,7 +64,7 @@ export default function Hero() {
 
                     {/* Floating badges */}
                     <div className="absolute -top-6 right-0 md:-right-6 bg-white dark:bg-[#252525] rounded-2xl shadow-xl p-4 flex items-center gap-3 border dark:border-gray-800">
-                        <div className="text-3xl">🌳</div>
+                        <div className="text-3xl" suppressHydrationWarning>🌳</div>
                         <div>
                             <p className="font-semibold text-gray-900 dark:text-gray-100">8 Generations</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Connected</p>

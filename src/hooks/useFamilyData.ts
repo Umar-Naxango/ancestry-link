@@ -271,27 +271,46 @@ export function useFamilyData() {
     }
 
     const loadSession = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        setAuthUserId(data.user.id);
-        setAuthEmail(data.user.email || '');
-        setAuthName(data.user.user_metadata?.full_name || data.user.email || 'User');
-        setAuthAvatar(data.user.user_metadata?.avatar_url || '');
-      } else {
-        setAuthUserId(null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setAuthUserId(user.id);
+          setAuthEmail(user.email || '');
+          setAuthName(user.user_metadata?.full_name || user.email || 'User');
+          setAuthAvatar(user.user_metadata?.avatar_url || '');
+        } else {
+          setAuthUserId(null);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error loading session:', err);
+        setLoading(false);
       }
     };
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
-      loadSession();
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAuthUserId(session.user.id);
+        setAuthEmail(session.user.email || '');
+        setAuthName(session.user.user_metadata?.full_name || session.user.email || 'User');
+        setAuthAvatar(session.user.user_metadata?.avatar_url || '');
+      } else {
+        setAuthUserId(null);
+        setLoading(false);
+      }
     });
 
     loadSession();
-    fetchFamilyData();
     return () => {
       subscription.subscription.unsubscribe();
     };
-  }, [fetchFamilyData]);
+  }, []);
+
+  useEffect(() => {
+    if (authUserId) {
+      fetchFamilyData();
+    }
+  }, [authUserId, fetchFamilyData]);
 
   const refreshData = useCallback(() => {
     fetchFamilyData();
@@ -317,7 +336,7 @@ export function useFamilyData() {
         email: child.email || '',
         phone: child.phone || '',
         location: child.location || '',
-        picture: child.picture || child.photo || `https://randomuser.me/api/portraits/${normalizedGender === 'female' ? 'women' : 'men'}/${Math.floor(Math.random() * 99)}.jpg`,
+        picture: child.picture || child.photo || '',
         birth_date: child.birthDate || '',
         age: child.age || 0,
         relation: 'Child',
@@ -374,7 +393,7 @@ export function useFamilyData() {
         email: '',
         phone: '',
         location: spouse.location || '',
-        picture: spouse.picture || spouse.photo || `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 99)}.jpg`,
+        picture: spouse.picture || spouse.photo || '',
         birth_date: spouse.birthDate || spouse.marriageDate || '',
         age: 0,
         relation: 'Spouse',
@@ -501,6 +520,74 @@ export function useFamilyData() {
     }
   }, [authUserId, currentUser, canEdit]);
 
+  const deleteMember = useCallback(async (memberId: string) => {
+    if (!authUserId) return false;
+    if (!canEdit) {
+      setError('You have view-only permission.');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('family_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      setFamilyMembers(prev => prev.filter(m => m.id !== memberId));
+      return true;
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to delete family member.'));
+      return false;
+    }
+  }, [authUserId, canEdit]);
+
+  const updateMember = useCallback(async (memberId: string, updates: Partial<FamilyMember>) => {
+    if (!authUserId) return false;
+    if (!canEdit) {
+      setError('You have view-only permission.');
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('family_members')
+        .update({
+          name: updates.name,
+          first_name: updates.firstName,
+          last_name: updates.lastName,
+          gender: updates.gender,
+          email: updates.email,
+          phone: updates.phone,
+          location: updates.location,
+          picture: updates.picture,
+          birth_date: updates.birthDate,
+          age: updates.age,
+          status: updates.status,
+        })
+        .eq('id', memberId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setFamilyMembers(prev => prev.map(m => m.id === memberId ? {
+        ...m,
+        ...updates,
+      } : m));
+      return true;
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to update family member.'));
+      return false;
+    }
+  }, [authUserId, canEdit]);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  }, []);
+
   return {
     loading,
     error,
@@ -514,5 +601,8 @@ export function useFamilyData() {
     addSpouse,
     addStory,
     updateProfile,
+    updateMember,
+    deleteMember,
+    logout,
   };
 }

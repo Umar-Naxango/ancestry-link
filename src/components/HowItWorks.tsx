@@ -45,7 +45,7 @@ export default function HowItWorks() {
                             <div className="mx-auto w-24 h-24 bg-emerald-50 dark:bg-[#121212] border dark:border-gray-800 rounded-2xl flex items-center justify-center mb-6">
                                 {step.icon}
                             </div>
-                            <div className="text-emerald-600 dark:text-emerald-400 font-mono text-sm font-bold mb-2">{step.number}</div>
+                            <div className="text-emerald-600 dark:text-emerald-400 font-mono text-sm font-bold mb-2" suppressHydrationWarning>{step.number}</div>
                             <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">{step.title}</h3>
                             <p className="text-gray-600 dark:text-gray-400">{step.desc}</p>
                         </div>

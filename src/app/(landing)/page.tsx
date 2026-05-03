@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 
 export default function Landing() {
   return (
-    <main>
+    <main suppressHydrationWarning>
       <Navbar />
       <Hero />
       <Features />

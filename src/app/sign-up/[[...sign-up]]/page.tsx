@@ -4,14 +4,14 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { FaGoogle, FaApple, FaUser, FaEnvelope, FaLock, FaArrowRight, FaTree } from 'react-icons/fa';
 
 export default function SignUpPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [resending, setResending] = useState(false);
@@ -19,8 +19,6 @@ export default function SignUpPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -31,25 +29,19 @@ export default function SignUpPage() {
         },
       });
       if (signUpError) {
-        setError(signUpError.message);
+        toast.error(signUpError.message);
         return;
       }
 
       if (!data.session) {
-        setSuccessMessage('Account created. Check your email and click the verification link before signing in.');
+        toast.success('Account created! Please check your email for the verification link.');
         return;
       }
 
-      setSuccessMessage('Account created successfully. Redirecting to dashboard...');
-      router.push('/dashboard');
-      router.refresh();
+      toast.success('Account created successfully!');
+      window.location.href = '/dashboard';
     } catch (err) {
-      const isNetworkError = err instanceof TypeError;
-      setError(
-        isNetworkError
-          ? 'Unable to reach Supabase. Check your internet, NEXT_PUBLIC_SUPABASE_URL, and that your Supabase project is active.'
-          : 'Unexpected error while creating account. Please try again.'
-      );
+      toast.error('Unexpected error while creating account.');
     } finally {
       setLoading(false);
     }
@@ -57,11 +49,10 @@ export default function SignUpPage() {
 
   const resendVerification = async () => {
     if (!email) {
-      setError('Enter your email address first, then click resend.');
+      toast.error('Enter your email address first.');
       return;
     }
     setResending(true);
-    setError(null);
     try {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
@@ -71,19 +62,18 @@ export default function SignUpPage() {
         },
       });
       if (resendError) {
-        setError(resendError.message);
+        toast.error(resendError.message);
         return;
       }
-      setSuccessMessage('Verification email sent. Check inbox/spam and open the latest link.');
+      toast.success('Verification email resent. Please check your inbox.');
     } catch {
-      setError('Unable to resend verification email right now. Please try again.');
+      toast.error('Unable to resend verification email.');
     } finally {
       setResending(false);
     }
   };
 
   const signUpWithProvider = async (provider: 'google' | 'apple') => {
-    setError(null);
     setOauthLoading(provider);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
@@ -92,66 +82,123 @@ export default function SignUpPage() {
       },
     });
     if (oauthError) {
-      setError(oauthError.message);
+      toast.error(oauthError.message);
       setOauthLoading(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 px-6 py-8 md:grid-cols-2 md:gap-8 md:px-10">
-        <section className="hidden md:flex flex-col justify-between rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/20 via-emerald-400/10 to-slate-900 p-10">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-teal-500/10 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-0 rounded-[2.5rem] overflow-hidden shadow-2xl border dark:border-gray-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl relative z-10">
+        {/* Left Side - Hero */}
+        <div className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-emerald-200">AncestryLink</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight">Create your family hub</h1>
-            <p className="mt-4 max-w-sm text-slate-300">Build your lineage together with secure accounts and shared stories.</p>
+            <Link href="/" className="flex items-center gap-3 mb-12 group">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <FaTree size={24} />
+              </div>
+              <span className="text-2xl font-bold tracking-tight">AncestryLink</span>
+            </Link>
+            <h1 className="text-5xl font-bold leading-tight mb-6">Build your family hub today.</h1>
+            <p className="text-emerald-100 text-lg max-w-md">Start tracing your roots and collaborating with family members in a secure, beautiful environment.</p>
           </div>
-          <p className="text-sm text-slate-400">Fast setup with social sign in options</p>
-        </section>
+          <div className="space-y-4">
+            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+              <p className="text-sm font-medium italic">"The easiest way to keep our family history alive for the next generation."</p>
+              <p className="mt-2 text-xs font-bold text-emerald-200">— The Thompson Family</p>
+            </div>
+          </div>
+        </div>
 
-        <section className="flex items-center">
-          <form onSubmit={onSubmit} className="w-full rounded-3xl border border-white/10 bg-white/95 p-8 text-slate-900 shadow-2xl backdrop-blur md:p-10">
-            <h2 className="text-3xl font-semibold">Create account</h2>
-            <p className="mt-2 text-sm text-slate-600">Start in less than a minute.</p>
+        {/* Right Side - Form */}
+        <div className="p-8 md:p-16 bg-white dark:bg-[#111111]">
+          <div className="max-w-sm mx-auto">
+            <div className="mb-10">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Create Account</h2>
+              <p className="text-gray-500 dark:text-gray-400 mt-2">Join thousands of families preservation legacy.</p>
+            </div>
 
-            <div className="mt-8 space-y-3">
-              <button type="button" onClick={() => signUpWithProvider('google')} disabled={oauthLoading !== null} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 font-medium transition hover:bg-slate-50 disabled:opacity-60">
-                <span>{oauthLoading === 'google' ? 'Connecting...' : 'Continue with Google'}</span>
-              </button>
-              <button type="button" onClick={() => signUpWithProvider('apple')} disabled={oauthLoading !== null} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 font-medium transition hover:bg-slate-50 disabled:opacity-60">
-                <span>{oauthLoading === 'apple' ? 'Connecting...' : 'Continue with Apple'}</span>
+            <div className="space-y-4">
+              <button 
+                onClick={() => signUpWithProvider('google')} 
+                disabled={oauthLoading !== null}
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl border-2 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-200 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-[0.98]"
+              >
+                <FaGoogle className="text-red-500" />
+                {oauthLoading === 'google' ? 'Connecting...' : 'Continue with Google'}
               </button>
             </div>
 
-            <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs uppercase tracking-wide text-slate-500">Or use email</span>
-              <div className="h-px flex-1 bg-slate-200" />
+            <div className="flex items-center gap-4 my-8">
+              <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Or Register</span>
+              <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
             </div>
 
-            <input className="mb-3 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none ring-emerald-500 focus:ring-2" type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            <input className="mb-3 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none ring-emerald-500 focus:ring-2" type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <input className="mb-4 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none ring-emerald-500 focus:ring-2" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div className="relative group">
+                <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder="Full Name" 
+                  value={fullName} 
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-transparent rounded-2xl focus:border-emerald-500 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white"
+                  required 
+                />
+              </div>
+              <div className="relative group">
+                <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                <input 
+                  type="email" 
+                  placeholder="Email Address" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-transparent rounded-2xl focus:border-emerald-500 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white"
+                  required 
+                />
+              </div>
+              <div className="relative group">
+                <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                <input 
+                  type="password" 
+                  placeholder="Create Password" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-transparent rounded-2xl focus:border-emerald-500 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white"
+                  required 
+                />
+              </div>
 
-            {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-            {successMessage ? <p className="mb-4 text-sm text-emerald-700">{successMessage}</p> : null}
-            <button disabled={loading} className="w-full rounded-xl bg-slate-900 py-3 font-medium text-white transition hover:bg-slate-800 disabled:opacity-60">
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </button>
-            <button
-              type="button"
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? 'Creating...' : <>Create Account <FaArrowRight size={14} /></>}
+              </button>
+            </form>
+
+            <button 
               onClick={resendVerification}
-              disabled={resending}
-              className="mt-3 w-full rounded-xl border border-slate-300 py-3 font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              className="w-full mt-4 text-sm font-bold text-gray-400 hover:text-emerald-600 transition-colors"
             >
-              {resending ? 'Sending...' : 'Resend verification email'}
+              Didn't get the email? Resend
             </button>
-            <p className="mt-5 text-sm text-slate-600">
-              Already have an account? <Link href="/sign-in" className="font-medium text-emerald-700 hover:text-emerald-800">Sign in</Link>
+
+            <p className="mt-8 text-center text-gray-500 dark:text-gray-400 font-medium">
+              Already have an account? <Link href="/sign-in" className="text-emerald-600 font-bold hover:underline">Sign in</Link>
             </p>
-          </form>
-        </section>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+

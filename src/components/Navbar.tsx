@@ -28,12 +28,26 @@ export default function Navbar() {
 
                 <div className="hidden md:flex items-center gap-4">
                     <ThemeToggle />
-                    <Link href="/sign-in" className="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition">
-                        Log in
-                    </Link>
-                    <Link href="/sign-up" className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition font-medium">
-                        Start Free
-                    </Link>
+                    {typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? (
+                        <button 
+                            onClick={async () => {
+                                await (await import('@/lib/supabase')).supabase.auth.signOut();
+                                window.location.href = '/';
+                            }}
+                            className="px-6 py-2 bg-red-500/10 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition font-medium"
+                        >
+                            Log out
+                        </button>
+                    ) : (
+                        <>
+                            <Link href="/sign-in" className="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition">
+                                Log in
+                            </Link>
+                            <Link href="/sign-up" className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition font-medium">
+                                Start Free
+                            </Link>
+                        </>
+                    )}
                 </div>
 
                 {/* Mobile Menu Button */}
