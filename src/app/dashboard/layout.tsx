@@ -43,28 +43,34 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const syncUserFromSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-      if (!user) {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        const user = data.session?.user;
+        if (!user) {
+          window.location.href = '/sign-in';
+          return;
+        }
+        const letter = user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U';
+        setAvatarLetter(String(letter).toUpperCase());
+        setCheckingAuth(false);
+      } catch (err) {
+        console.error('Auth check error:', err);
         window.location.href = '/sign-in';
-        return;
       }
-      const letter = user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U';
-      setAvatarLetter(String(letter).toUpperCase());
-      setCheckingAuth(false);
     };
 
     syncUserFromSession();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user;
-      if (!user) {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
         window.location.href = '/sign-in';
-        return;
+      } else if (session?.user) {
+        const letter = session.user.user_metadata?.full_name?.[0] || session.user.email?.[0] || 'U';
+        setAvatarLetter(String(letter).toUpperCase());
+        setCheckingAuth(false);
       }
-      const letter = user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U';
-      setAvatarLetter(String(letter).toUpperCase());
-      setCheckingAuth(false);
     });
 
     return () => {
@@ -82,7 +88,10 @@ export default function DashboardLayout({
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#121212] flex items-center justify-center">
-        <p className="text-gray-700 dark:text-gray-200">Loading your dashboard...</p>
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-700 dark:text-gray-200 font-medium">Verifying session...</p>
+        </div>
       </div>
     );
   }
@@ -167,13 +176,26 @@ export default function DashboardLayout({
             </button>
 
             {/* User Profile */}
-            <button
-              onClick={signOut}
-              className="w-10 h-10 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
-              title="Sign out"
-            >
-              {avatarLetter}
-            </button>
+            <div className="relative group">
+              <button
+                className="w-10 h-10 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center justify-center"
+              >
+                {avatarLetter}
+              </button>
+              
+              {/* Dropdown Menu */}
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <Link href="/dashboard/settings" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+                  Settings
+                </Link>
+                <button 
+                  onClick={signOut}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 

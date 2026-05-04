@@ -1,12 +1,35 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FaTree, FaBars, FaTimes } from 'react-icons/fa';
 import ThemeToggle from './ThemeToggle';
+import { supabase } from '@/lib/supabase';
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setIsLoggedIn(!!session);
+        };
+        checkSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsLoggedIn(!!session);
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []);
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+    };
 
     return (
         <nav className="bg-white dark:bg-[#1a1a1a] shadow-md sticky top-0 z-50 dark:border-b dark:border-gray-800">
@@ -28,16 +51,18 @@ export default function Navbar() {
 
                 <div className="hidden md:flex items-center gap-4">
                     <ThemeToggle />
-                    {typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? (
-                        <button 
-                            onClick={async () => {
-                                await (await import('@/lib/supabase')).supabase.auth.signOut();
-                                window.location.href = '/';
-                            }}
-                            className="px-6 py-2 bg-red-500/10 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition font-medium"
-                        >
-                            Log out
-                        </button>
+                    {isLoggedIn ? (
+                        <>
+                            <Link href="/dashboard" className="px-6 py-2 text-emerald-600 font-medium hover:underline transition">
+                                Dashboard
+                            </Link>
+                            <button 
+                                onClick={handleSignOut}
+                                className="px-6 py-2 bg-red-500/10 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition font-medium"
+                            >
+                                Log out
+                            </button>
+                        </>
                     ) : (
                         <>
                             <Link href="/sign-in" className="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition">
@@ -59,17 +84,22 @@ export default function Navbar() {
             {/* Mobile Menu */}
             {isOpen && (
                 <div className="md:hidden bg-white dark:bg-[#1a1a1a] border-t dark:border-gray-800 py-4 px-6 space-y-4">
-                <div className="flex justify-end pt-2">
-                    <ThemeToggle />
+                    <div className="flex justify-end pt-2">
+                        <ThemeToggle />
+                    </div>
+                    {isLoggedIn ? (
+                        <div className="pt-4 border-t dark:border-gray-800 flex flex-col gap-3">
+                            <Link href="/dashboard" className="py-3 text-center text-emerald-600 font-medium">Dashboard</Link>
+                            <button onClick={handleSignOut} className="py-3 bg-red-500/10 text-red-600 rounded-xl text-center font-medium">Log out</button>
+                        </div>
+                    ) : (
+                        <div className="pt-4 border-t dark:border-gray-800 flex flex-col gap-3">
+                            <Link href="/sign-in" className="py-3 text-center text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium">Log in</Link>
+                            <Link href="/sign-up" className="py-3 bg-emerald-600 text-white rounded-xl text-center font-medium">Start Free</Link>
+                        </div>
+                    )}
                 </div>
-                <Link href="/sign-in" className="block py-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400">Log in</Link>
-                <Link href="/sign-up" className="block py-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400">Start Free</Link>
-                <div className="pt-4 border-t dark:border-gray-800 flex flex-col gap-3">
-                    <Link href="/sign-in" className="py-3 text-center text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium">Log in</Link>
-                    <Link href="/sign-up" className="py-3 bg-emerald-600 text-white rounded-xl text-center font-medium">Start Free</Link>
-                </div>
-            </div>
             )}
         </nav>
     );
-}
+}
