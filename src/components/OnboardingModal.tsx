@@ -41,6 +41,8 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialDa
     const onSelectPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        const inputEl = e.target;
         setUploading(true);
         try {
             const { data } = await supabase.auth.getUser();
@@ -48,9 +50,11 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialDa
             const url = await uploadCompressedImage(file, data.user.id, 'profiles');
             setForm(prev => ({ ...prev, photo: url }));
         } catch (err) {
+            console.error('Upload error:', err);
             alert(err instanceof Error ? err.message : 'Upload failed');
         } finally {
             setUploading(false);
+            if (inputEl) inputEl.value = '';
         }
     };
 

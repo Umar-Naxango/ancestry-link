@@ -81,7 +81,8 @@ export default function AddMemberModal({ isOpen, onClose, onAdd }: AddMemberModa
                             type="file"
                             accept="image/*"
                             onChange={onSelectPhoto}
-                            className="w-full px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl focus:outline-none"
+                            disabled={uploading}
+                            className="w-full px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl focus:outline-none disabled:opacity-50"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Choose from device. We auto-compress before upload.</p>
                     </div>

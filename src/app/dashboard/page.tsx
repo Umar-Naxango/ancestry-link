@@ -35,13 +35,13 @@ export default function ProfilePage() {
   const children = familyMembers.filter(m => m.relation === 'Child');
   const hasAnyMember = familyMembers.length > 0;
   
-  const isProfileIncomplete = !currentUser?.birthDate || !currentUser?.location;
+  const shouldShowOnboarding = currentUser && !(currentUser as any).onboarded;
 
   useEffect(() => {
-    if (!loading && currentUser && isProfileIncomplete) {
+    if (!loading && shouldShowOnboarding) {
       setIsOnboardingOpen(true);
     }
-  }, [loading, currentUser, isProfileIncomplete]);
+  }, [loading, shouldShowOnboarding]);
 
   if (loading) {
     return (

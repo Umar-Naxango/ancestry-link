@@ -179,16 +179,18 @@ export function useFamilyData() {
         name: activeUser.full_name || authName,
         firstName: (activeUser.full_name || authName).split(' ')[0],
         lastName: (activeUser.full_name || authName).split(' ').slice(1).join(' ') || '',
-        gender: 'male' as const,
+        gender: (activeUser.gender as 'male' | 'female') || 'male',
         email: activeUser.email || authEmail,
-        phone: '',
-        location: '',
+        phone: activeUser.phone || '',
+        location: activeUser.location || '',
         picture: activeUser.avatar_url || authAvatar,
-        birthDate: '',
+        birthDate: activeUser.birth_date || '',
         age: 0,
         relation: 'Self',
         status: 'Living',
-      });
+        onboarded: activeUser.onboarded || false,
+        bio: activeUser.bio || '',
+      } as any);
 
       // Fetch family members
       const { data: members, error: membersError } = await supabase
@@ -480,7 +482,7 @@ export function useFamilyData() {
     }
   }, [authUserId, ensureDbUserId, canEdit]);
 
-  const updateProfile = useCallback(async (data: { name: string; birthDate: string; photo?: string; phone?: string; email?: string; location?: string; bio?: string }) => {
+  const updateProfile = useCallback(async (data: { name: string; birthDate: string; photo?: string; phone?: string; email?: string; location?: string; bio?: string; onboarded?: boolean }) => {
     if (!authUserId || !currentUser) return false;
     if (!canEdit) {
       setError('You have view-only permission. Ask for editor access to update profile.');
@@ -496,6 +498,11 @@ export function useFamilyData() {
         .update({
           full_name: data.name,
           avatar_url: data.photo,
+          phone: data.phone,
+          location: data.location,
+          birth_date: data.birthDate,
+          bio: data.bio,
+          onboarded: data.onboarded !== undefined ? data.onboarded : true, // Mark as onboarded by default when updating
         })
         .eq('auth_user_id', authUserId);
 
@@ -511,6 +518,8 @@ export function useFamilyData() {
         phone: data.phone || prev.phone,
         email: data.email || prev.email,
         location: data.location || prev.location,
+        bio: data.bio || (prev as any).bio,
+        onboarded: data.onboarded !== undefined ? data.onboarded : true,
       } : null);
       setError(null);
       return true;

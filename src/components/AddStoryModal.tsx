@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { uploadCompressedImage } from '@/lib/mediaUpload';
 
 interface AddStoryModalProps {
     isOpen: boolean;
@@ -11,6 +13,29 @@ interface AddStoryModalProps {
 export default function AddStoryModal({ isOpen, onClose, onAdd }: AddStoryModalProps) {
     const [form, setForm] = useState({ title: '', category: 'memory', date: '', description: '', location: '', image: '' });
     const [submitting, setSubmitting] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+
+    const onSelectPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        const inputEl = e.target;
+        setUploadError(null);
+        setUploading(true);
+        try {
+            const { data } = await supabase.auth.getUser();
+            if (!data.user) throw new Error('Sign in again before uploading photos.');
+            const url = await uploadCompressedImage(file, data.user.id, 'stories');
+            setForm((prev) => ({ ...prev, image: url }));
+        } catch (err) {
+            console.error('Upload error:', err);
+            setUploadError(err instanceof Error ? err.message : 'Failed to upload photo.');
+        } finally {
+            setUploading(false);
+            if (inputEl) inputEl.value = '';
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,7 +135,20 @@ export default function AddStoryModal({ isOpen, onClose, onAdd }: AddStoryModalP
                     </div>
 
                     <div>
-                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo URL</label>
+                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={onSelectPhoto}
+                            disabled={uploading}
+                            className="w-full px-5 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl focus:outline-none disabled:opacity-50"
+                        />
+                        {uploading && <p className="text-xs text-emerald-600 mt-2">Compressing and uploading...</p>}
+                        {uploadError && <p className="text-xs text-red-500 mt-2">{uploadError}</p>}
+                    </div>
+
+                    <div>
+                        <label className="block mb-2 font-medium text-gray-900 dark:text-gray-200">Photo URL (optional)</label>
                         <input
                             type="text"
                             value={form.image}

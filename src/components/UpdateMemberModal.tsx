@@ -48,6 +48,8 @@ export default function UpdateMemberModal({ isOpen, onClose, onUpdate, onDelete,
     const onSelectPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        
+        const inputEl = e.target;
         setUploading(true);
         try {
             const { data } = await supabase.auth.getUser();
@@ -55,9 +57,11 @@ export default function UpdateMemberModal({ isOpen, onClose, onUpdate, onDelete,
             const url = await uploadCompressedImage(file, data.user.id, 'members');
             setForm(prev => ({ ...prev, photo: url }));
         } catch (err) {
+            console.error('Upload error:', err);
             alert(err instanceof Error ? err.message : 'Upload failed');
         } finally {
             setUploading(false);
+            if (inputEl) inputEl.value = '';
         }
     };
 
@@ -101,7 +105,7 @@ export default function UpdateMemberModal({ isOpen, onClose, onUpdate, onDelete,
                             </div>
                             <label className="absolute bottom-0 right-0 p-2 bg-emerald-600 text-white rounded-full cursor-pointer hover:scale-110 transition-transform">
                                 <FaCamera size={14} />
-                                <input type="file" accept="image/*" className="hidden" onChange={onSelectPhoto} />
+                                <input type="file" accept="image/*" className="hidden" onChange={onSelectPhoto} disabled={uploading} />
                             </label>
                             {uploading && <div className="absolute inset-0 bg-white/60 dark:bg-black/60 flex items-center justify-center rounded-full">
                                 <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
