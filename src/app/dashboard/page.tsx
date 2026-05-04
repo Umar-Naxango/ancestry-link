@@ -10,15 +10,15 @@ import OnboardingModal from '@/components/OnboardingModal';
 import { useFamilyData } from '@/hooks/useFamilyData';
 
 export default function ProfilePage() {
-  const { 
-    loading, 
-    error, 
-    currentUser, 
-    familyMembers, 
+  const {
+    loading,
+    error,
+    currentUser,
+    familyMembers,
     canEdit,
-    refreshData, 
-    addChild, 
-    addSpouse, 
+    refreshData,
+    addChild,
+    addSpouse,
     updateProfile,
     updateMember,
     deleteMember
@@ -34,14 +34,14 @@ export default function ProfilePage() {
   const spouses = familyMembers.filter(m => m.relation === 'Spouse');
   const children = familyMembers.filter(m => m.relation === 'Child');
   const hasAnyMember = familyMembers.length > 0;
-  
-  const shouldShowOnboarding = currentUser && !(currentUser as any).onboarded;
+
+  const isProfileIncomplete = !currentUser?.birthDate || !currentUser?.location;
 
   useEffect(() => {
-    if (!loading && shouldShowOnboarding) {
+    if (!loading && currentUser && isProfileIncomplete) {
       setIsOnboardingOpen(true);
     }
-  }, [loading, shouldShowOnboarding]);
+  }, [loading, currentUser, isProfileIncomplete]);
 
   if (loading) {
     return (
@@ -65,7 +65,7 @@ export default function ProfilePage() {
           <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">My Profile</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your personal & family information</p>
         </div>
-        <button 
+        <button
           onClick={refreshData}
           className="flex items-center gap-2 px-4 py-2 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition font-medium"
         >
@@ -98,7 +98,7 @@ export default function ProfilePage() {
                   <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-4 py-1.5 rounded-full text-sm font-medium">ID: MEM-{currentUser.id.slice(0, 8)}</span>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsUpdateModalOpen(true)}
                 disabled={!canEdit}
                 className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 w-full md:w-auto font-bold"
@@ -159,15 +159,15 @@ export default function ProfilePage() {
               Spouse
             </h3>
             {canEdit && spouses.length === 0 && (
-              <button 
-                onClick={() => setIsSpouseModalOpen(true)} 
+              <button
+                onClick={() => setIsSpouseModalOpen(true)}
                 className="text-emerald-600 dark:text-emerald-400 text-sm font-bold hover:underline"
               >
                 + Add
               </button>
             )}
           </div>
-          
+
           {spouses.length === 0 ? (
             <div className="text-center py-8 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-3xl">
               <p className="text-gray-400 text-sm italic">No spouse added</p>
@@ -182,7 +182,7 @@ export default function ProfilePage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{sp.birthDate ? `Born ${sp.birthDate}` : 'No date'}</p>
                   </div>
                   {canEdit && (
-                    <button 
+                    <button
                       onClick={() => { setSelectedMember(sp); setIsEditMemberModalOpen(true); }}
                       className="p-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-emerald-600 transition-all"
                     >
@@ -235,7 +235,7 @@ export default function ProfilePage() {
                   <div className="relative mb-4">
                     <img src={child.picture?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(child.name || 'Child')}&background=0ea5e9&color=ffffff`} alt={child.name} className="w-24 h-24 rounded-[1.5rem] object-cover shadow-lg group-hover:scale-105 transition-transform" />
                     {canEdit && (
-                      <button 
+                      <button
                         onClick={() => { setSelectedMember(child); setIsEditMemberModalOpen(true); }}
                         className="absolute -top-2 -right-2 p-2 bg-white dark:bg-gray-800 text-gray-400 hover:text-emerald-600 rounded-xl shadow-md opacity-0 group-hover:opacity-100 transition-all"
                       >
