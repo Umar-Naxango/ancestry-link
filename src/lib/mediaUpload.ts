@@ -1,11 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import { fileExt } from '@/lib/fileExt';
 
 const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET || 'family-media';
-
-function fileExt(name: string) {
-  const parts = name.split('.');
-  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'jpg';
-}
 
 /**
  * Robustly load an image from a File or Blob
@@ -95,4 +91,3 @@ export async function uploadCompressedImage(
 
   return data.publicUrl;
 }
-
