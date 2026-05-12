@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL,
   full_name TEXT,
   avatar_url TEXT,
+  bio TEXT,
+  onboarded BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -27,6 +29,10 @@ CREATE TABLE IF NOT EXISTS family_members (
   age INTEGER,
   relation TEXT NOT NULL,
   status TEXT DEFAULT 'Living' CHECK (status IN ('Living', 'Deceased')),
+  -- Advanced Relationships
+  father_id UUID REFERENCES family_members(id) ON DELETE SET NULL,
+  mother_id UUID REFERENCES family_members(id) ON DELETE SET NULL,
+  partner_id UUID REFERENCES family_members(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -77,7 +83,9 @@ ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_collaborators ENABLE ROW LEVEL SECURITY;
 
--- 6. Create policies for users to only see their own data
+-- 6. Create policies
+
+-- Users table
 CREATE POLICY "Users can view their own data" ON users
   FOR SELECT USING (auth.uid() = auth_user_id);
 
@@ -87,31 +95,55 @@ CREATE POLICY "Users can insert their own data" ON users
 CREATE POLICY "Users can update their own data" ON users
   FOR UPDATE USING (auth.uid() = auth_user_id);
 
--- For family_members
-CREATE POLICY "Users can view their family members" ON family_members
-  FOR SELECT USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+-- For family_members (Includes Collaborators)
+CREATE POLICY "Users can view family members they own or collaborate on" ON family_members
+  FOR SELECT USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid())
+  );
 
-CREATE POLICY "Users can insert family members" ON family_members
-  FOR INSERT WITH CHECK (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can insert family members if owner or editor" ON family_members
+  FOR INSERT WITH CHECK (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
-CREATE POLICY "Users can update their family members" ON family_members
-  FOR UPDATE USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can update family members if owner or editor" ON family_members
+  FOR UPDATE USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
-CREATE POLICY "Users can delete their family members" ON family_members
-  FOR DELETE USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can delete family members if owner or editor" ON family_members
+  FOR DELETE USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
--- For stories
-CREATE POLICY "Users can view their stories" ON stories
-  FOR SELECT USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+-- For stories (Includes Collaborators)
+CREATE POLICY "Users can view stories they own or collaborate on" ON stories
+  FOR SELECT USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid())
+  );
 
-CREATE POLICY "Users can insert stories" ON stories
-  FOR INSERT WITH CHECK (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can insert stories if owner or editor" ON stories
+  FOR INSERT WITH CHECK (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
-CREATE POLICY "Users can update their stories" ON stories
-  FOR UPDATE USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can update stories if owner or editor" ON stories
+  FOR UPDATE USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
-CREATE POLICY "Users can delete their stories" ON stories
-  FOR DELETE USING (user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
+CREATE POLICY "Users can delete stories if owner or editor" ON stories
+  FOR DELETE USING (
+    user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid())
+    OR user_id IN (SELECT owner_user_id FROM family_collaborators WHERE collaborator_auth_user_id = auth.uid() AND permission = 'editor')
+  );
 
 -- Invites
 CREATE POLICY "Owners can view their invites" ON family_invites
@@ -145,13 +177,15 @@ CREATE POLICY "Owners can manage collaborators" ON family_collaborators
 CREATE POLICY "Owners can remove collaborators" ON family_collaborators
   FOR DELETE USING (owner_user_id IN (SELECT id FROM users WHERE auth_user_id = auth.uid()));
 
--- 7. Storage setup (run in SQL editor once)
--- Create a public bucket named family-media in Storage UI (or via SQL if preferred).
--- Then apply policies for authenticated uploads:
+-- 7. Storage setup
+-- Run this in your Supabase dashboard Storage section:
+-- 1. Create a public bucket named 'family-media'
+-- 2. Run these policies:
+
 -- create policy "Authenticated users can upload media"
 -- on storage.objects for insert to authenticated
 -- with check (bucket_id = 'family-media');
---
+
 -- create policy "Public can read media"
 -- on storage.objects for select to public
 -- using (bucket_id = 'family-media');

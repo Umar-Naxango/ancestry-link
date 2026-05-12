@@ -38,16 +38,45 @@ export default function NotificationsPage() {
 
   const handleInvite = async (inviteId: string, status: 'accepted' | 'revoked') => {
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // 1. Get the invite details first
+      const { data: invite, error: fetchError } = await supabase
+        .from('family_invites')
+        .select('*')
+        .eq('id', inviteId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // 2. Update the status
+      const { error: updateError } = await supabase
         .from('family_invites')
         .update({ status })
         .eq('id', inviteId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // 3. If accepted, add to collaborators
+      if (status === 'accepted') {
+        const { error: collaboError } = await supabase
+          .from('family_collaborators')
+          .insert({
+            owner_user_id: invite.owner_user_id,
+            collaborator_auth_user_id: user.id,
+            permission: invite.role
+          });
+
+        if (collaboError && collaboError.code !== '23505') {
+          throw collaboError;
+        }
+      }
       
       toast.success(`Invitation ${status === 'accepted' ? 'accepted' : 'declined'}`);
       setInvites(prev => prev.filter(i => i.id !== inviteId));
     } catch (err) {
+      console.error('Error handling invite:', err);
       toast.error('Failed to update invitation.');
     }
   };

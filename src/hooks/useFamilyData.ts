@@ -17,6 +17,11 @@ export interface FamilyMember {
   age: number;
   relation: string;
   status: 'Living' | 'Deceased';
+  fatherId?: string;
+  motherId?: string;
+  partnerId?: string;
+  bio?: string;
+  onboarded?: boolean;
 }
 
 export interface FamilyStory {
@@ -34,6 +39,9 @@ export interface FamilyStory {
 type AddMemberInput = Partial<FamilyMember> & {
   photo?: string;
   marriageDate?: string;
+  fatherId?: string;
+  motherId?: string;
+  partnerId?: string;
 };
 
 type AddStoryInput = Partial<FamilyStory> & {
@@ -229,6 +237,9 @@ export function useFamilyData() {
           age: member.age || 0,
           relation: member.relation || '',
           status: member.status === 'Deceased' ? 'Deceased' : 'Living',
+          fatherId: member.father_id,
+          motherId: member.mother_id,
+          partnerId: member.partner_id,
         }))
       );
       setStories(
@@ -341,8 +352,11 @@ export function useFamilyData() {
         picture: child.picture || child.photo || '',
         birth_date: child.birthDate || '',
         age: child.age || 0,
-        relation: 'Child',
+        relation: child.relation || 'Child',
         status: 'Living',
+        father_id: child.fatherId,
+        mother_id: child.motherId,
+        partner_id: child.partnerId,
       };
 
       const { data, error } = await supabase
@@ -367,6 +381,9 @@ export function useFamilyData() {
         age: data.age,
         relation: data.relation,
         status: data.status,
+        fatherId: data.father_id,
+        motherId: data.mother_id,
+        partnerId: data.partner_id,
       }]);
       setError(null);
       return true;
@@ -400,6 +417,7 @@ export function useFamilyData() {
         age: 0,
         relation: 'Spouse',
         status: 'Living',
+        partner_id: spouse.partnerId,
       };
 
       const { data, error } = await supabase
@@ -424,6 +442,7 @@ export function useFamilyData() {
         age: data.age,
         relation: data.relation,
         status: data.status,
+        partnerId: data.partner_id,
       }]);
       setError(null);
       return true;
